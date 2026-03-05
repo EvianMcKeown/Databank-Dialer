@@ -33,7 +33,7 @@ CasioDialer/
 ```
 
 ## Setup & Development
-# Prerequisites
+### Prerequisites
 * [*.NET SDK*](http://dotnet.microsoft.com/download)
 * [*Node.js & npm*](https://nodejs.org/en)
 
@@ -48,11 +48,11 @@ npm install
 
 2. Development Workflow
 Run in two separate terminal windows to handle the build process:
-# C# Server
+### C# Server
 ```
 dotnet watch
 ```
-# TypeScript Compiler
+### TypeScript Compiler
 ```
 # Watch and compile TS to wwwroot/js/
 npx tsc -w
