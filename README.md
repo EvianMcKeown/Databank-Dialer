@@ -37,7 +37,7 @@ CasioDialer/
 * [*.NET SDK*](http://dotnet.microsoft.com/download)
 * [*Node.js & npm*](https://nodejs.org/en)
 
-1. Install Dependencies
+1. ### Install Dependencies
 ```
 # Install .NET packages
 dotnet restore
@@ -46,13 +46,13 @@ dotnet restore
 npm install
 ```
 
-2. Development Workflow
+2. ### Development Workflow
 Run in two separate terminal windows to handle the build process:
-### C# Server
+#### C# Server
 ```
 dotnet watch
 ```
-### TypeScript Compiler
+#### TypeScript Compiler
 ```
 # Watch and compile TS to wwwroot/js/
 npx tsc -w
