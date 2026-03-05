@@ -5,6 +5,7 @@ appsettings.Development.json
 
 .vs/
 .vscode/
+.idea
 
 # TypeScript / Node
 node_modules/
