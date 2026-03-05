@@ -6,7 +6,7 @@ A high-performance, lightweight web application designed to listen to the acoust
 This project uses a low-latency audio pipeline to ensure hardware dial tones are captured and processed accurately:
 * **Frontend**: TypeScript with *AudioWorklet* for thread-isolated sampling.
 * **Transport**: *SignalR* streaming 16-bit PCM data from the browser to the server.
-* **Backend**: *ASP.NET Core* (C#) implementing the *Goertzel Algorithm* for DTMF frequency detection.
+* **Backend**: *ASP.NET Core* (C#) implementing the [*Goertzel Algorithm*](http://en.wikipedia.org/wiki/Goertzel_algorithm) for DTMF frequency detection.
 
 
 
