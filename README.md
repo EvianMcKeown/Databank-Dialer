@@ -3,7 +3,7 @@
 A high-performance, lightweight web application designed to listen to the acoustic DTMF "dialer" tones from a *Casio Databank DBA-800*/*DBA-80* watch. It decodes in real-time using a C# backend and provides a "click-to-dial" interface for modern smartphones.
 
 ## Architecture
-This project uses a "Low-Latency Audio Pipeline" to ensure vintage hardware tones are captured and processed accurately:
+This project uses a low-latency audio pipeline to ensure hardware dial tones are captured and processed accurately:
 * **Frontend**: TypeScript with *AudioWorklet* for thread-isolated sampling.
 * **Transport**: *SignalR* streaming 16-bit PCM data from the browser to the server.
 * **Backend**: *ASP.NET Core* (C#) implementing the *Goertzel Algorithm* for DTMF frequency detection.
