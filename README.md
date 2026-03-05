@@ -30,3 +30,33 @@ CasioDialer/
 ├── AudioHub.cs             # C# SignalR Hub
 ├── Program.cs              # ASP.NET Core Entry Point
 └── src.csproj              # .NET Project Configuration
+```
+
+## Setup & Development
+# Prerequisites
+* [*.NET SDK*](http://dotnet.microsoft.com/download)
+* [*Node.js & npm*](https://nodejs.org/en)
+
+1. Install Dependencies
+```
+# Install .NET packages
+dotnet restore
+
+# Install TypeScript & SignalR
+npm install
+```
+
+2. Development Workflow
+Run in two separate terminal windows to handle the build process:
+# C# Server
+```
+dotnet watch
+```
+# TypeScript Compiler
+```
+# Watch and compile TS to wwwroot/js/
+npx tsc -w
+```
+
+## License
+[GNU General Public License 3.0](https://github.com/EvianMcKeown/Casio-Databank-Dialer/blob/dev/LICENSE)
