@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "ESNext",
+    "rootDir": "./Scripts",
+    "outDir": "./wwwroot/js",
+    "lib": ["DOM", "ESNext", "WebWorker"],
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["Scripts/**/*"]
+}

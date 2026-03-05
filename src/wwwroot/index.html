@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casio Databank Decoder</title>
+</head>
+<body>
+    <div class="dialer">
+        <h3>DBA-800 LISTENER</h3>
+        <div id="numberDisplay">_</div>
+        <button id="startBtn" class="btn">START LISTENING</button>
+        <div id="callContainer" style="display:none;">
+            <a id="dialLink" href="#" class="btn" style="background: #28a745; text-decoration: none;">DIAL NUMBER</a>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
