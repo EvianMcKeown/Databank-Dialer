@@ -13,10 +13,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Build
-wwwroot/js/app.js
-wwwroot/js/audio-processor.js
-# map file for debugging
-wwwroot/js/*.map
+src/wwwroot/js
 
 # OS
 .DS_Store
