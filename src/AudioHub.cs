@@ -10,10 +10,60 @@ public class AudioHub : Hub
     public AudioHub(ILogger<AudioHub> logger)
     {
         _logger = logger;
-        _logger.LogInformation("--- AudioHub Initialised ---");
+        //_logger.LogInformation("--- AudioHub Initialised ---");
     }
     private static List<float> _accumulationBuffer = new List<float>();
 
+    private (List<GoertzelResult>, List<GoertzelResult>) SeperateRowsCols(List<GoertzelResult> results)
+    {
+        var lowTones = results.Where(r => rows.Contains(r.Frequency)).OrderByDescending(r => r.Power).ToList();
+        var highTones = results.Where(r => cols.Contains(r.Frequency)).OrderByDescending(r => r.Power).ToList();
+        return (lowTones, highTones);
+    }
+
+    private bool StandardTwist(List<GoertzelResult> results)
+    {
+        /***
+        Calculate standard (low tone: high tone) twist ratio & set threshold to 4dB acceptable standard twist
+        ***/
+        var (lowTones, highTones) = SeperateRowsCols(results);
+        // DEBUG
+        _logger.LogInformation("Row: {RP} @ {RF} ——— Col: {CP} @ {CF} ——— ReverseTwist: {Ratio} ——— StandardTwist: {SRatio}", Math.Round(lowTones[0].Power, 2), Math.Round(lowTones[0].Frequency, 2), Math.Round(highTones[0].Power, 2), Math.Round(highTones[0].Frequency, 2), Math.Round(lowTones[0].Power / highTones[0].Power, 2), Math.Round(highTones[0].Power / lowTones[0].Power, 2));
+        if ((highTones[0].Power / lowTones[0].Power) < 5) return true;
+        // else
+        return false;
+    }
+
+    private bool ReverseTwist(List<GoertzelResult> results)
+    {
+        /***
+        Calculate reverse (high tone : low tone) twist ratio & set threshold to acceptable reverse twist
+        ***/
+
+        // (ratio = 10) to account for microphone frequency response oddities   ~10dB
+        var (lowTones, highTones) = SeperateRowsCols(results);
+        if ((lowTones[0].Power / highTones[0].Power) < 10) return true;
+        // else
+        return false;
+    }
+
+    private bool SecondOrderHarmonic(List<GoertzelResult> results, float[] samples)
+    {
+        /***
+        Check that second order harmonic is at least 10dB quieter than fundamental for winning row and column respectively
+        ***/
+
+        var (lowTones, highTones) = SeperateRowsCols(results);
+        float row2nd = lowTones[0].Frequency * 2; 
+        float col2nd = highTones[0].Frequency * 2;
+        float[] winner2ndOrder = {row2nd, col2nd};
+
+        // rerun Goertzel with harmonic freqs of winners
+        List<GoertzelResult> harmonics = Goertzel.Compute(samples, winner2ndOrder, 8000);
+
+        if ((lowTones[0].Power - harmonics[0].Power) > 10 && (highTones[0].Power - harmonics[1].Power) > 10) return true;
+        return false;
+    }
 
     private bool SignalToNoise(List<GoertzelResult> results, float[] groupFreqs)
     {
@@ -29,9 +79,9 @@ public class AudioHub : Hub
     {
         _accumulationBuffer.AddRange(chunk);
 
-        await Clients.Caller.SendAsync("DebugLog", "C# received the audio!");
+        //await Clients.Caller.SendAsync("DebugLog", "C# received the audio!");
 
-        _logger.LogInformation("Received a chunk of {Count} samples", chunk.Length);
+        //_logger.LogInformation("Received a chunk of {Count} samples", chunk.Length);
 
         const int N = 256; // target window size @ 8kHz
 
@@ -43,13 +93,16 @@ public class AudioHub : Hub
 
             char? digit = DetectCasioDigit(toProcess);
 
+            // TODO: PAUSE detection algorithm
+            //  + minimum/maximum digit duration checks
+
             if (digit.HasValue)
             {
                 await Clients.Caller.SendAsync("DetectedDigit", digit.Value.ToString());
             }
             else
             {
-                _logger.LogInformation("No digit detected!!!");
+                //_logger.LogInformation("No digit detected!!!");
             }
         }
     }
@@ -62,20 +115,22 @@ public class AudioHub : Hub
         var lowGroup = results.Where(r => rows.Contains(r.Frequency)).OrderByDescending(r => r.Power).First();
         var highGroup = results.Where(r => cols.Contains(r.Frequency)).OrderByDescending(r => r.Power).First();
 
-        double threshold = 0.05 * Math.Pow((double)samples.Length / 512, 2);
+        double threshold = 2 * Math.Pow((double)samples.Length / 512, 2);
 
         // both Row + Col need to be above threshold
         if (lowGroup.Power > threshold && highGroup.Power > threshold)
         {
-            // Check signal to noise ratio
+            // Check relative peaks power
             if (!SignalToNoise(results, rows) || !SignalToNoise(results, cols))
             {
                 return null;
             }
 
             // Check Twist
-            double twist = highGroup.Power / lowGroup.Power;
-            if (twist < 0.1 || twist > 10.0) return null;
+            if (!StandardTwist(results) || !ReverseTwist(results)) return null;
+
+            // Check 2nd order harmonic
+            if (!SecondOrderHarmonic(results, samples)) return null;
 
             // freq -> key indices
             int rowIdx = Array.IndexOf(rows, lowGroup.Frequency);
