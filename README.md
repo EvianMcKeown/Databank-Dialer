@@ -1,5 +1,4 @@
 # Casio-Databank-Dialer
-
 A high-performance, lightweight web application designed to listen to the acoustic DTMF "dialer" tones from a *Casio Databank DBA-800*/*DBA-80* watch. It decodes in real-time using a C# backend and provides a "click-to-dial" interface for modern smartphones.
 
 ## Architecture
@@ -8,6 +7,7 @@ This project uses a low-latency audio pipeline to ensure hardware dial tones are
 * **Transport**: *SignalR* streaming 16-bit PCM data from the browser to the server.
 * **Backend**: *ASP.NET Core* (C#) implementing the [*Goertzel Algorithm*](http://en.wikipedia.org/wiki/Goertzel_algorithm) for DTMF frequency detection.
 
+![DBA-800-preview](https://github.com/user-attachments/assets/aab3ab68-803d-45e5-89e6-3a7af018c68b)
 
 
 ## Technology Used
