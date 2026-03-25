@@ -8,19 +8,34 @@ public class AudioHub : Hub
 
     private readonly ILogger<AudioHub> _logger;
 
-    // valid digit persists for at least two chunks (of 136 samples @ 8kHz with 16 sample overlap)
+    // Minimum consecutive passing frames before a digit is confirmed.
+    // At 136-sample windows with 120-sample slide @ 8kHz → ~15ms per advance.
+    // 3 frames ≈ 45ms minimum tone duration. ITU-T Q.24 requires 40ms minimum.
     private const int DIGIT_COUNT_THRESH = 3;
+
+    // Frames of silence required to declare inter-digit gap and re-arm.
+    // 2 frames ≈ 30ms.
     private const int PAUSE_COUNT_THRESH = 2;
 
     // --- Per-connection state ---
     // Keyed by SignalR connection ID so concurrent clients don't corrupt each other.
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ConnectionState> _connectionStates = new();
 
+    public enum DetectionState
+    {
+        Idle,
+        Candidate,
+        Confirmed,  // digit detected more than THRESH
+        Holding,    // digit sustained
+        PauseCandidate  // digit dropped, waiting to confirm
+    }
+
     private class ConnectionState
     {
         public List<float> AccumulationBuffer { get; } = new();
+        public DetectionState State { get; set; } = DetectionState.Idle;
         public char? LastFrameDigit { get; set; } = null;
-        public char? ReportedDigit { get; set; } = null;
+        public char? CandidateDigit { get; set; } = null;
         public int ConsecutiveDetections { get; set; } = 0;
         public int ConsecutivePause { get; set; } = 0;
     }
@@ -129,37 +144,139 @@ public class AudioHub : Hub
 
     private async Task ProcessDetectionState(char? currentFrameDigit, ConnectionState state)
     {
-        if (currentFrameDigit.HasValue)
+
+        switch (state.State)
+        {
+            case DetectionState.Idle:
+            case DetectionState.Candidate:
+                await HandleCandidate(currentFrameDigit, state);
+                break;
+
+            case DetectionState.Confirmed:
+            case DetectionState.Holding:
+                await HandleHolding(currentFrameDigit, state);
+                break;
+
+            case DetectionState.PauseCandidate:
+                await HandlePauseCandidate(currentFrameDigit, state);
+                break;
+        }
+
+        /*
+            if (currentFrameDigit.HasValue)
+                {
+                    state.ConsecutivePause = 0;
+
+                    if (currentFrameDigit == state.LastFrameDigit)
+                    {
+                        state.ConsecutiveDetections++;
+
+                        if (state.ConsecutiveDetections >= DIGIT_COUNT_THRESH && state.ReportedDigit != currentFrameDigit)
+                        {
+                            state.ReportedDigit = currentFrameDigit;
+                            await Clients.Caller.SendAsync("DetectedDigit", state.ReportedDigit.Value.ToString());
+                            _logger.LogInformation("Digit Updated: {D}", state.ReportedDigit.Value);
+                        }
+                    }
+                    else
+                    {
+                        state.LastFrameDigit = currentFrameDigit;
+                        state.ConsecutiveDetections = 1;
+                    }
+                }
+                else
+                {
+                    state.ConsecutivePause++;
+
+                    if (state.ConsecutivePause >= PAUSE_COUNT_THRESH)
+                    {
+                        state.LastFrameDigit = null;
+                        state.ReportedDigit = null;
+                        state.ConsecutiveDetections = 0;
+                    }
+                }
+                */
+    }
+
+    private Task HandlePauseCandidate(char? currentFrameDigit, ConnectionState state)
+    {
+        if (currentFrameDigit == state.LastFrameDigit)
+        {
+            // tone resumed; return to holding
+            state.ConsecutivePause = 0;
+            state.State = DetectionState.Holding;
+            return Task.CompletedTask;
+        }
+
+        if (currentFrameDigit != null)
+        {
+            state.CandidateDigit = currentFrameDigit;
+            state.ConsecutiveDetections = 1;
+            state.ConsecutivePause = 0;
+            state.State = DetectionState.Candidate;
+            return Task.CompletedTask;
+        }
+
+        // implied 'if (currentFrameDigit == null)'
+        state.ConsecutivePause++;
+
+        if (state.ConsecutivePause >= PAUSE_COUNT_THRESH)
+        {
+            state.State = DetectionState.Idle;
+            state.LastFrameDigit = null;
+            state.CandidateDigit = null;
+            state.ConsecutiveDetections = 0;
+            state.ConsecutivePause = 0;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleHolding(char? currentFrameDigit, ConnectionState state)
+    {
+        if (currentFrameDigit == state.LastFrameDigit)
         {
             state.ConsecutivePause = 0;
-
-            if (currentFrameDigit == state.LastFrameDigit)
-            {
-                state.ConsecutiveDetections++;
-
-                if (state.ConsecutiveDetections >= DIGIT_COUNT_THRESH && state.ReportedDigit != currentFrameDigit)
-                {
-                    state.ReportedDigit = currentFrameDigit;
-                    await Clients.Caller.SendAsync("DetectedDigit", state.ReportedDigit.Value.ToString());
-                    _logger.LogInformation("Digit Updated: {D}", state.ReportedDigit.Value);
-                }
-            }
-            else
-            {
-                state.LastFrameDigit = currentFrameDigit;
-                state.ConsecutiveDetections = 1;
-            }
+            state.State = DetectionState.Holding;
+            return;
         }
-        else
-        {
-            state.ConsecutivePause++;
 
-            if (state.ConsecutivePause >= PAUSE_COUNT_THRESH)
-            {
-                state.LastFrameDigit = null;
-                state.ReportedDigit = null;
-                state.ConsecutiveDetections = 0;
-            }
+        if (currentFrameDigit != null)
+        {
+            // SHOULD NOT HAPPEN
+            _logger.LogCritical("While Holding, digit changed without any Pause! THIS SHOULD NOT HAPPEN!!!");
+            return;
+        }
+
+        // implied 'if (currentFrameDigit == null)'
+        state.ConsecutivePause++;
+        state.State = DetectionState.PauseCandidate;
+    }
+
+    private async Task HandleCandidate(char? currentFrameDigit, ConnectionState state)
+    {
+        if (currentFrameDigit == null)
+        {
+            // only reset if candidate changes
+            return;
+        }
+
+        if (currentFrameDigit != state.CandidateDigit)
+        {
+            state.CandidateDigit = currentFrameDigit;
+            state.ConsecutiveDetections = 1;
+            state.State = DetectionState.Candidate;
+        }
+
+        state.ConsecutiveDetections++;
+
+        if (state.ConsecutiveDetections >= DIGIT_COUNT_THRESH)
+        {
+            state.LastFrameDigit = currentFrameDigit;
+            state.ConsecutivePause = 0;
+            state.State = DetectionState.Confirmed;
+            await Clients.Caller.SendAsync("DetectedDigit", currentFrameDigit.Value.ToString());
+            _logger.LogInformation("Confirmed: {D}", currentFrameDigit.Value);
         }
     }
 
