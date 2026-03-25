@@ -7,12 +7,44 @@ public class AudioHub : Hub
     private static readonly float[] freqs = { 697f, 770f, 852f, 941f, 1209f, 1336f, 1477f };
 
     private readonly ILogger<AudioHub> _logger;
+
+    // valid digit persists for at least two chunks (of 136 samples @ 8kHz with 16 sample overlap)
+    private const int DIGIT_COUNT_THRESH = 3;
+    private const int PAUSE_COUNT_THRESH = 2;
+
+    // --- Per-connection state ---
+    // Keyed by SignalR connection ID so concurrent clients don't corrupt each other.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ConnectionState> _connectionStates = new();
+
+    private class ConnectionState
+    {
+        public List<float> AccumulationBuffer { get; } = new();
+        public char? LastFrameDigit { get; set; } = null;
+        public char? ReportedDigit { get; set; } = null;
+        public int ConsecutiveDetections { get; set; } = 0;
+        public int ConsecutivePause { get; set; } = 0;
+    }
+
     public AudioHub(ILogger<AudioHub> logger)
     {
         _logger = logger;
-        //_logger.LogInformation("--- AudioHub Initialised ---");
     }
-    private static List<float> _accumulationBuffer = new List<float>();
+
+    // Allocate state when a client connects.
+    public override Task OnConnectedAsync()
+    {
+        _connectionStates[Context.ConnectionId] = new ConnectionState();
+        _logger.LogInformation("Client connected: {Id}", Context.ConnectionId);
+        return base.OnConnectedAsync();
+    }
+
+    // Free state when a client disconnects to avoid memory leaks.
+    public override Task OnDisconnectedAsync(Exception? exception)
+    {
+        _connectionStates.TryRemove(Context.ConnectionId, out _);
+        _logger.LogInformation("Client disconnected: {Id}", Context.ConnectionId);
+        return base.OnDisconnectedAsync(exception);
+    }
 
     private (List<GoertzelResult>, List<GoertzelResult>) SeperateRowsCols(List<GoertzelResult> results)
     {
@@ -24,13 +56,11 @@ public class AudioHub : Hub
     private bool StandardTwist(List<GoertzelResult> results)
     {
         /***
-        Calculate standard (low tone: high tone) twist ratio & set threshold to 4dB acceptable standard twist
+        Calculate standard (low tone: high tone) twist ratio & set threshold to acceptable standard twist
         ***/
         var (lowTones, highTones) = SeperateRowsCols(results);
-        // DEBUG
         _logger.LogInformation("Row: {RP} @ {RF} ——— Col: {CP} @ {CF} ——— ReverseTwist: {Ratio} ——— StandardTwist: {SRatio}", Math.Round(lowTones[0].Power, 2), Math.Round(lowTones[0].Frequency, 2), Math.Round(highTones[0].Power, 2), Math.Round(highTones[0].Frequency, 2), Math.Round(lowTones[0].Power / highTones[0].Power, 2), Math.Round(highTones[0].Power / lowTones[0].Power, 2));
-        if ((highTones[0].Power / lowTones[0].Power) < 5) return true;
-        // else
+        if ((highTones[0].Power / lowTones[0].Power) < 4) return true;
         return false;
     }
 
@@ -39,11 +69,8 @@ public class AudioHub : Hub
         /***
         Calculate reverse (high tone : low tone) twist ratio & set threshold to acceptable reverse twist
         ***/
-
-        // (ratio = 10) to account for microphone frequency response oddities   ~10dB
         var (lowTones, highTones) = SeperateRowsCols(results);
-        if ((lowTones[0].Power / highTones[0].Power) < 10) return true;
-        // else
+        if ((lowTones[0].Power / highTones[0].Power) < 8) return true;
         return false;
     }
 
@@ -52,17 +79,17 @@ public class AudioHub : Hub
         /***
         Check that second order harmonic is at least 10dB quieter than fundamental for winning row and column respectively
         ***/
-
         var (lowTones, highTones) = SeperateRowsCols(results);
-        float row2nd = lowTones[0].Frequency * 2; 
+        float row2nd = lowTones[0].Frequency * 2;
         float col2nd = highTones[0].Frequency * 2;
-        float[] winner2ndOrder = {row2nd, col2nd};
+        float[] winner2ndOrder = { row2nd, col2nd };
 
-        // rerun Goertzel with harmonic freqs of winners
         List<GoertzelResult> harmonics = Goertzel.Compute(samples, winner2ndOrder, 8000);
 
-        if ((lowTones[0].Power - harmonics[0].Power) > 10 && (highTones[0].Power - harmonics[1].Power) > 10) return true;
-        return false;
+        bool rowCondition = harmonics[0].Power < (lowTones[0].Power * 0.1f);
+        bool colCondition = harmonics[1].Power < (highTones[0].Power * 0.1f);
+
+        return rowCondition && colCondition;
     }
 
     private bool SignalToNoise(List<GoertzelResult> results, float[] groupFreqs)
@@ -71,38 +98,67 @@ public class AudioHub : Hub
 
         if (group.Count < 2) return true;
 
-        // signal at least 6db louder than second best
         return group[0].Power > (group[1].Power * 4);
     }
 
     public async Task UploadAudioChunk(float[] chunk)
     {
-        _accumulationBuffer.AddRange(chunk);
-
-        //await Clients.Caller.SendAsync("DebugLog", "C# received the audio!");
-
-        //_logger.LogInformation("Received a chunk of {Count} samples", chunk.Length);
-
-        const int N = 256; // target window size @ 8kHz
-
-        // Sliding window with 50% overlap
-        if (_accumulationBuffer.Count >= N)
+        if (!_connectionStates.TryGetValue(Context.ConnectionId, out var state))
         {
-            float[] toProcess = _accumulationBuffer.ToArray();
-            _accumulationBuffer.RemoveRange(0, N / 2);
+            _logger.LogWarning("Received chunk from unknown connection: {Id}", Context.ConnectionId);
+            return;
+        }
+
+        state.AccumulationBuffer.AddRange(chunk);
+
+        const int N = 136;
+        const int SLIDE = N - 16; // 120 — advance by SLIDE to overlap by 16
+
+        // Drain ALL available windows per chunk, not just one.
+        // Previously used `if` here, which caused the buffer to grow unboundedly
+        // because only one window was consumed per incoming chunk.
+        while (state.AccumulationBuffer.Count >= N)
+        {
+            float[] toProcess = state.AccumulationBuffer.Take(N).ToArray();
+            state.AccumulationBuffer.RemoveRange(0, SLIDE);
 
             char? digit = DetectCasioDigit(toProcess);
+            await ProcessDetectionState(digit, state);
+        }
+    }
 
-            // TODO: PAUSE detection algorithm
-            //  + minimum/maximum digit duration checks
+    private async Task ProcessDetectionState(char? currentFrameDigit, ConnectionState state)
+    {
+        if (currentFrameDigit.HasValue)
+        {
+            state.ConsecutivePause = 0;
 
-            if (digit.HasValue)
+            if (currentFrameDigit == state.LastFrameDigit)
             {
-                await Clients.Caller.SendAsync("DetectedDigit", digit.Value.ToString());
+                state.ConsecutiveDetections++;
+
+                if (state.ConsecutiveDetections >= DIGIT_COUNT_THRESH && state.ReportedDigit != currentFrameDigit)
+                {
+                    state.ReportedDigit = currentFrameDigit;
+                    await Clients.Caller.SendAsync("DetectedDigit", state.ReportedDigit.Value.ToString());
+                    _logger.LogInformation("Digit Updated: {D}", state.ReportedDigit.Value);
+                }
             }
             else
             {
-                //_logger.LogInformation("No digit detected!!!");
+                state.LastFrameDigit = currentFrameDigit;
+                state.ConsecutiveDetections = 1;
+            }
+        }
+        else
+        {
+            state.ConsecutivePause++;
+
+            if (state.ConsecutivePause >= PAUSE_COUNT_THRESH)
+            {
+                state.LastFrameDigit = null;
+                state.ReportedDigit = null;
+                state.ConsecutiveDetections = 0;
             }
         }
     }
@@ -117,22 +173,17 @@ public class AudioHub : Hub
 
         double threshold = 2 * Math.Pow((double)samples.Length / 512, 2);
 
-        // both Row + Col need to be above threshold
         if (lowGroup.Power > threshold && highGroup.Power > threshold)
         {
-            // Check relative peaks power
             if (!SignalToNoise(results, rows) || !SignalToNoise(results, cols))
             {
                 return null;
             }
 
-            // Check Twist
             if (!StandardTwist(results) || !ReverseTwist(results)) return null;
 
-            // Check 2nd order harmonic
             if (!SecondOrderHarmonic(results, samples)) return null;
 
-            // freq -> key indices
             int rowIdx = Array.IndexOf(rows, lowGroup.Frequency);
             int colIdx = Array.IndexOf(cols, highGroup.Frequency);
 
