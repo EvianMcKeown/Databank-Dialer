@@ -243,8 +243,9 @@ public class AudioHub : Hub
 
         if (currentFrameDigit != null)
         {
-            // SHOULD NOT HAPPEN
-            _logger.LogCritical("While Holding, digit changed without any Pause! THIS SHOULD NOT HAPPEN!!!");
+            // _logger.LogInformation("While Holding, digit changed without any Pause, this is likely noise.");
+            state.ConsecutivePause++;
+            state.State = DetectionState.PauseCandidate;
             return;
         }
 

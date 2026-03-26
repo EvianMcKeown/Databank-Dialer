@@ -4,20 +4,20 @@ const connection = new signalR.HubConnectionBuilder().withUrl("/audioHub").confi
 
 connection.on("ReceiveStatus", (message: string) => { console.log("Server responded: " + message); });
 
-//const numberDisplay = document.getElementById("numberDisplay")!;
-//const startBtn = document.getElementById("startBtn")!;
-//const callContainer = document.getElementById("callContainer")!;
-//const dialLink = document.getElementById("dialLink") as HTMLAnchorElement;
+const numberDisplay = document.getElementById("numberDisplay")!;
+const startBtn = document.getElementById("startBtn")!;
+const callContainer = document.getElementById("callContainer")!;
+const dialLink = document.getElementById("dialLink") as HTMLAnchorElement;
 
 let fullNumber = "";
 
-//connection.on("DetectedDigit", (digit: string) => {
-//    fullNumber += digit;
-//    numberDisplay.innerText = fullNumber;
-//    // Show dial button
-//    callContainer.style.display = "block";
-//    dialLink.href = `tel:${fullNumber}`;
-//});
+connection.on("DetectedDigit", (digit: string) => {
+    fullNumber += digit;
+    numberDisplay.innerText = fullNumber;
+    // Show dial button
+    callContainer.style.display = "block";
+    dialLink.href = `tel:${fullNumber}`;
+});
 
 connection.on("DebugLog", (msg:string) => console.log("SERVER DEBUG:", msg));
 
