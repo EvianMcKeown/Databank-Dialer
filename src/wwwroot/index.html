@@ -1,22 +1,288 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Casio Databank Decoder</title>
+    <style>
+        @font-face {
+            font-family: 'SegmentFont';
+            src: url('fonts/DSEG7ClassicMini-Italic.woff2') format('woff2'),
+                url('fonts/DSEG7ClassicMini-Italic.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'MatrixFont';
+            src: url('fonts/MatrixSansScreen-Regular.woff2') format('woff2'),
+                url('fonts/MatrixSansScreen-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: sans-serif;
+        }
+
+        /* Watch wrapper */
+        .watch-wrapper {
+            position: relative;
+            /* Scale render down to a sensible viewport size. */
+            width: min(80vw, 80vh);
+            aspect-ratio: 1 / 1;
+        }
+
+        /* Blender render */
+        .watch-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            filter: drop-shadow(0 24px 48px rgba(0, 0, 0, .8));
+        }
+
+        /* Placeholder shown until watch-render.png is available */
+        .watch-placeholder {
+            width: 100%;
+            height: 100%;
+            border-radius: 18%;
+            background:
+                radial-gradient(ellipse 60% 55% at 50% 48%, #2e2e2e 0%, #1b1b1b 60%, #0d0d0d 100%);
+            box-shadow:
+                0 0 0 6px #3a3a3e,
+                0 0 0 12px #232323,
+                0 0 0 18px #333333,
+                0 24px 64px rgba(0, 0, 0, .9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* LCD screen cutout
+            The overlay is now a flex column containing two rows:
+                .lcd-row-top    - smaller, shows chars 1-8
+                .lcd-row-bottom - larger, shows chars 9-max once top is full
+        */
+        .lcd-overlay {
+            position: absolute;
+
+            top: 32%;
+            left: 22%;
+            width: 56%;
+            height: 26%;
+
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: flex-end;
+            overflow: hidden;
+
+            background: rgba(10, 10, 10, 0.35);
+            border-radius: 3px;
+        }
+
+        /* Shared row styles */
+        .lcd-row {
+            --skew: -8deg;
+            font-family: 'SegmentFont', 'Courier New', monospace;
+            letter-spacing: 0.12em;
+            color: #1a1a1a;
+            text-shadow:
+                0 0 4px rgba(26, 26, 26, 0.6),
+                0 0 12px rgba(20, 20, 20, 0.5);
+            transform: skewX(var(--skew));
+            transform-origin: left center;
+            white-space: nowrap;
+            image-rendering: pixelated;
+            -webkit-font-smoothing: none;
+            font-smooth: never;
+            transition: color 0.08s;
+            padding: 0 6%;
+            padding-left: 11%;
+            line-height: 1.0;
+        }
+
+        /* Top row - smaller, chars 1-8 */
+        .lcd-row-top {
+            font-size: clamp(33px, 7.8vw, 66px);
+            flex: 0 0 40%;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Bottom row - larger, chars 9-max */
+        .lcd-row-bottom {
+            font-size: clamp(16px, 4vw, 34px);
+            flex: 0 0 55%;
+            display: flex;
+            align-items: center;
+            /* Hidden until overflow begins */
+            visibility: hidden;
+        }
+
+        .lcd-row-bottom.active {
+            visibility: visible;
+        }
+
+        /* Idle cursor blink on top row */
+        .lcd-row-top.idle::after {
+            content: '_';
+            animation: blink 1.1s step-end infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Controls (outside the watch, below) */
+        .controls {
+            margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn {
+            font-family: 'MatrixFont', 'Courier New', monospace;
+            font-size: 24px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: #ffffff;
+            background: transparent;
+            border: 2px solid rgba(255, 255, 255, 0.0);
+            padding: 10px 28px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            border-color: rgba(255, 255, 255, 0.6);
+            box-shadow: 0 0 12px rgba(120, 120, 120, 0.3);
+        }
+
+        .btn:active {
+            background: rgba(200, 200, 200, 0.15);
+        }
+
+        #callContainer {
+            display: none;
+        }
+
+        #dialLink {
+            border-color: rgba(80, 200, 80, 0.6);
+            color: #7de87d;
+        }
+
+        /* Placeholder label */
+        .placeholder-label {
+            color: rgba(160, 106, 160, 0.25);
+            font-size: 11px;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            font-family: monospace;
+            pointer-events: none;
+            user-select: none;
+        }
+    </style>
 </head>
+
 <body>
-    <div class="dialer">
-        <h3>DBA-800 LISTENER</h3>
-        <div id="numberDisplay">_</div>
-        <button id="startBtn" class="btn">START LISTENING</button>
-        <div id="callContainer" style="display:none;">
-            <a id="dialLink" href="#" class="btn" style="background: #28a745; text-decoration: none;">DIAL NUMBER</a>
+
+    <div style="display:flex; flex-direction:column; align-items:center;">
+
+        <div class="watch-wrapper">
+            <img class="watch-img" src="images/DBA-800-2x.png" alt="Casio DBA-800">
+
+            <!-- LCD overlay - sits on top of the watch image -->
+            <div class="lcd-overlay">
+                <!-- Top row: smaller, displays chars 1-8 -->
+                <div id="lcd-top" class="lcd-row lcd-row-top idle"></div>
+                <!-- Bottom row: larger, displays chars 9-max; hidden until needed -->
+                <div id="lcd-bottom" class="lcd-row lcd-row-bottom"></div>
+            </div>
+
         </div>
+
+        <div class="controls">
+            <button id="startBtn" class="btn">START LISTENING</button>
+            <div id="callContainer">
+                <a id="dialLink" href="#" class="btn">Dial Number</a>
+            </div>
+        </div>
+
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
-    
     <script type="module" src="js/app.js"></script>
+
+    <script>
+        const LCD_WRAP_AT = 8;   // chars before bottom row activates
+        const LCD_MAX = 16;   // total cap (8 top + 8 bottom)
+
+        const lcdTop = document.getElementById('lcd-top');
+        const lcdBottom = document.getElementById('lcd-bottom');
+        const callBox = document.getElementById('callContainer');
+        const dialLink = document.getElementById('dialLink');
+
+        function renderNumber(num) {
+            const raw = num.slice(0, LCD_WRAP_AT);
+            const top = raw.length > 2
+                ? raw.slice(0, 2) + '\u2009\u2009' + raw.slice(2)
+                : raw;
+            const bottom = num.slice(LCD_WRAP_AT);
+
+            lcdTop.textContent = top;
+            lcdTop.classList.toggle('idle', num.length === 0);
+
+            lcdBottom.textContent = bottom;
+            lcdBottom.classList.toggle('active', bottom.length > 0);
+        }
+
+        document.addEventListener('dtmf:fullNumber', e => {
+            const num = e.detail;
+            renderNumber(num);
+            if (num.length > 0) {
+                callBox.style.display = 'block';
+                dialLink.href = `tel:${num}`;
+            }
+        });
+
+        document.addEventListener('dtmf:reset', () => {
+            renderNumber('');
+            callBox.style.display = 'none';
+            dialLink.href = '#';
+        });
+    </script>
+
 </body>
+
 </html>
