@@ -82,11 +82,14 @@
         */
         .lcd-overlay {
             position: absolute;
+            container-type: size;
+            container-name: lcd;
 
-            top: 32%;
+            top: 31%;
             left: 22%;
             width: 56%;
             height: 26%;
+            gap: 0;
 
             display: flex;
             flex-direction: column;
@@ -94,19 +97,19 @@
             justify-content: flex-end;
             overflow: hidden;
 
-            background: rgba(10, 10, 10, 0.35);
+            background: rgba(10, 10, 10, 0.0);
             border-radius: 3px;
         }
 
         /* Shared row styles */
         .lcd-row {
-            --skew: -8deg;
+            --skew: -1deg;
             font-family: 'SegmentFont', 'Courier New', monospace;
-            letter-spacing: 0.12em;
-            color: #1a1a1a;
+            letter-spacing: 0.04em;
+            color: #3a3a3a;
             text-shadow:
-                0 0 4px rgba(26, 26, 26, 0.6),
-                0 0 12px rgba(20, 20, 20, 0.5);
+                0 0 8px rgba(26, 26, 26, 0.4),
+                2px 4px 4px rgba(20, 20, 20, 0.2);
             transform: skewX(var(--skew));
             transform-origin: left center;
             white-space: nowrap;
@@ -114,25 +117,32 @@
             -webkit-font-smoothing: none;
             font-smooth: never;
             transition: color 0.08s;
-            padding: 0 6%;
-            padding-left: 11%;
-            line-height: 1.0;
+            padding: 0 0;
+            line-height: 0.2;
         }
 
         /* Top row - smaller, chars 1-8 */
         .lcd-row-top {
-            font-size: clamp(33px, 7.8vw, 66px);
-            flex: 0 0 40%;
+            font-size: 12cqw;
+            flex: 0 0 0%;
             display: flex;
             align-items: center;
+            padding-left: 11%;
+            padding-right: 6%;
+            padding-bottom: 0%;
+            margin-bottom: 0%;
         }
 
         /* Bottom row - larger, chars 9-max */
         .lcd-row-bottom {
-            font-size: clamp(16px, 4vw, 34px);
-            flex: 0 0 55%;
+            font-size: 16cqw;
+            flex: 0 0 70%;
             display: flex;
             align-items: center;
+            padding-left: 6%;
+            padding-right: 6%;
+            margin-top: 0%;
+            padding-top: 0%;
             /* Hidden until overflow begins */
             visibility: hidden;
         }
@@ -194,12 +204,39 @@
         }
 
         #callContainer {
-            display: none;
+            display: none;          /* hidden until a digit arrives */
+            position: absolute;
+            top:  24.6%;
+            left: 34%;
+            z-index: 10;
+            width: 38%;
+            height: 9%;
+            container-type: size;
+            container-name: dial;
+            background:rgba(0, 0, 0, .0);
         }
 
         #dialLink {
+            color: #5fb15f;
             border-color: rgba(80, 200, 80, 0.6);
-            color: #7de87d;
+            font-family: 'MatrixFont', 'Courier New', monospace;
+            font-size: 16cqw;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 106%;
+            height: 60%;
+            padding: 8% !important;
+            margin: 0;
+            border: 2px solid;
+            border-radius: 3px;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            white-space: nowrap;
+            letter-spacing: 0px;
+            
         }
 
         /* Placeholder label */
@@ -222,6 +259,10 @@
         <div class="watch-wrapper">
             <img class="watch-img" src="images/DBA-800-2x.png" alt="Casio DBA-800">
 
+            <div id="callContainer">
+                <a id="dialLink" href="#" class="btn">Dial Number</a>
+            </div>
+
             <!-- LCD overlay - sits on top of the watch image -->
             <div class="lcd-overlay">
                 <!-- Top row: smaller, displays chars 1-8 -->
@@ -234,9 +275,6 @@
 
         <div class="controls">
             <button id="startBtn" class="btn">START LISTENING</button>
-            <div id="callContainer">
-                <a id="dialLink" href="#" class="btn">Dial Number</a>
-            </div>
         </div>
 
     </div>
@@ -246,7 +284,7 @@
 
     <script>
         const LCD_WRAP_AT = 8;   // chars before bottom row activates
-        const LCD_MAX = 16;   // total cap (8 top + 8 bottom)
+        const LCD_MAX = 14;   // total cap (8 top + 6 bottom)
 
         const lcdTop = document.getElementById('lcd-top');
         const lcdBottom = document.getElementById('lcd-bottom');
@@ -255,9 +293,10 @@
 
         function renderNumber(num) {
             const raw = num.slice(0, LCD_WRAP_AT);
-            const top = raw.length > 2
-                ? raw.slice(0, 2) + '\u2009\u2009' + raw.slice(2)
-                : raw;
+            /* const top = raw.length > 2
+                ? raw.slice(0, 2) + '\u200A' + raw.slice(2)
+                : raw; */
+            const top = num.slice(0, LCD_WRAP_AT)
             const bottom = num.slice(LCD_WRAP_AT);
 
             lcdTop.textContent = top;

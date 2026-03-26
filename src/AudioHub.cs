@@ -127,11 +127,9 @@ public class AudioHub : Hub
         state.AccumulationBuffer.AddRange(chunk);
 
         const int N = 136;
-        const int SLIDE = N - 16; // 120 — advance by SLIDE to overlap by 16
+        const int SLIDE = N - 16; // 120 - advance by SLIDE to overlap by 16
 
-        // Drain ALL available windows per chunk, not just one.
-        // Previously used `if` here, which caused the buffer to grow unboundedly
-        // because only one window was consumed per incoming chunk.
+        // Drain ALL available windows per chunk
         while (state.AccumulationBuffer.Count >= N)
         {
             float[] toProcess = state.AccumulationBuffer.Take(N).ToArray();
@@ -161,41 +159,6 @@ public class AudioHub : Hub
                 await HandlePauseCandidate(currentFrameDigit, state);
                 break;
         }
-
-        /*
-            if (currentFrameDigit.HasValue)
-                {
-                    state.ConsecutivePause = 0;
-
-                    if (currentFrameDigit == state.LastFrameDigit)
-                    {
-                        state.ConsecutiveDetections++;
-
-                        if (state.ConsecutiveDetections >= DIGIT_COUNT_THRESH && state.ReportedDigit != currentFrameDigit)
-                        {
-                            state.ReportedDigit = currentFrameDigit;
-                            await Clients.Caller.SendAsync("DetectedDigit", state.ReportedDigit.Value.ToString());
-                            _logger.LogInformation("Digit Updated: {D}", state.ReportedDigit.Value);
-                        }
-                    }
-                    else
-                    {
-                        state.LastFrameDigit = currentFrameDigit;
-                        state.ConsecutiveDetections = 1;
-                    }
-                }
-                else
-                {
-                    state.ConsecutivePause++;
-
-                    if (state.ConsecutivePause >= PAUSE_COUNT_THRESH)
-                    {
-                        state.LastFrameDigit = null;
-                        state.ReportedDigit = null;
-                        state.ConsecutiveDetections = 0;
-                    }
-                }
-                */
     }
 
     private Task HandlePauseCandidate(char? currentFrameDigit, ConnectionState state)
