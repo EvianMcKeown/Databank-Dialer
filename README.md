@@ -1,6 +1,9 @@
 # Casio-Databank-Dialer
 A high-performance, lightweight web application designed to listen to the acoustic DTMF "dialer" tones from a *Casio Databank DBA-800*/*DBA-80* watch. It decodes in real-time using a C# backend and provides a "click-to-dial" interface for modern smartphones.
 
+## Status
+[![Web App](https://github.com/EvianMcKeown/Databank-Dialer/actions/workflows/deploy.yml/badge.svg)](https://github.com/EvianMcKeown/Databank-Dialer/actions/workflows/deploy.yml)
+
 ## Architecture
 This project uses a low-latency audio pipeline to ensure hardware dial tones are captured and processed accurately:
 * **Frontend**: TypeScript with *AudioWorklet* for thread-isolated sampling.
