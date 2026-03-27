@@ -6,12 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Bank DTMF Decoder</title>
     <meta name="title" content="Casio Data Bank Dialer | Decode & Dial from your Watch">
-    <meta name="description" content="Dial phone numbers from your watch like its 1987. Hold your watch to the microphone to decode tones and dial on your smartphone.">
+    <meta name="description"
+        content="Dial phone numbers from your watch like its 1987. Hold your watch to the microphone to decode tones and dial on your smartphone.">
 
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://dialer.ejmlabs.co.za/">
     <meta property="og:title" content="Casio Data Bank Dialer | Decode & Dial from your Watch">
-    <meta property="og:description" content="Dial phone numbers from your watch like its 1987. Hold your watch to the microphone to decode tones and dial on your smartphone.">
+    <meta property="og:description"
+        content="Dial phone numbers from your watch like its 1987. Hold your watch to the microphone to decode tones and dial on your smartphone.">
     <meta property="og:image" content="images/preview.jpg">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
@@ -19,8 +21,11 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://dialer.ejmlabs.co.za/">
     <meta property="twitter:title" content="Casio Data Bank Dialer | Decode & Dial from your Watch">
-    <meta property="twitter:description" content="Dial phone numbers from your watch like its 1987. Hold your watch to the microphone to decode tones and dial on your smartphone.">
+    <meta property="twitter:description"
+        content="Dial phone numbers from your watch like its 1987. Hold your watch to the microphone to decode tones and dial on your smartphone.">
     <meta property="twitter:image" content="images/preview.jpg">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
     <style>
         @font-face {
@@ -221,16 +226,17 @@
         }
 
         #callContainer {
-            display: none;          /* hidden until a digit arrives */
+            display: none;
+            /* hidden until a digit arrives */
             position: absolute;
-            top:  24.6%;
+            top: 24.6%;
             left: 34%;
             z-index: 10;
             width: 38%;
             height: 9%;
             container-type: size;
             container-name: dial;
-            background:rgba(0, 0, 0, .0);
+            background: rgba(0, 0, 0, .0);
         }
 
         #dialLink {
@@ -253,7 +259,7 @@
             transition: border-color 0.15s, box-shadow 0.15s;
             white-space: nowrap;
             letter-spacing: 0px;
-            
+
         }
 
         /* Placeholder label */
@@ -266,10 +272,30 @@
             pointer-events: none;
             user-select: none;
         }
+
+        .github-link {
+            position: fixed;
+            top: 20px;
+            right: 24px;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 22px;
+            text-decoration: none;
+            transition: color 0.2s;
+            z-index: 100;
+        }
+
+        .github-link:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }
     </style>
 </head>
 
 <body>
+
+    <a class="github-link" href="https://github.com/EvianMcKeown/Databank-Dialer/" target="_blank" rel="noopener noreferrer"
+        aria-label="Source code on GitHub">
+        <i class="fa-brands fa-github"></i>
+    </a>
 
     <div style="display:flex; flex-direction:column; align-items:center;">
 
