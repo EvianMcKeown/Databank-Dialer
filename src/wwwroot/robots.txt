@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /stats.html   # Keep telemetry out of search results
+Disallow: /goaccess     # Block the websocket path from crawlers
+
+# Prevent aggressive AI/LLM scrapers from eating your bandwidth
+User-agent: GPTBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+Sitemap: https://dialer.ejmlabs.co.za/sitemap.xml
