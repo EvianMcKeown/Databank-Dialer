@@ -13,6 +13,16 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v6
 
+      - name: Setup Node.js (for TypeScript)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies and Compile TS
+        run: |
+          npm install -g typescript
+          tsc
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
