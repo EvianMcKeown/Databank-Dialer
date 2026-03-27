@@ -74,7 +74,9 @@ public class AudioHub : Hub
         Calculate standard (low tone: high tone) twist ratio & set threshold to acceptable standard twist
         ***/
         var (lowTones, highTones) = SeperateRowsCols(results);
+        /* DEBUG
         _logger.LogInformation("Row: {RP} @ {RF} ——— Col: {CP} @ {CF} ——— ReverseTwist: {Ratio} ——— StandardTwist: {SRatio}", Math.Round(lowTones[0].Power, 2), Math.Round(lowTones[0].Frequency, 2), Math.Round(highTones[0].Power, 2), Math.Round(highTones[0].Frequency, 2), Math.Round(lowTones[0].Power / highTones[0].Power, 2), Math.Round(highTones[0].Power / lowTones[0].Power, 2));
+        */
         if ((highTones[0].Power / lowTones[0].Power) < 4) return true;
         return false;
     }
@@ -240,15 +242,17 @@ public class AudioHub : Hub
             state.ConsecutivePause = 0;
             state.State = DetectionState.Confirmed;
             await Clients.Caller.SendAsync("DetectedDigit", currentFrameDigit.Value.ToString());
+            /* DEBUG
             _logger.LogInformation("Confirmed: {D}", currentFrameDigit.Value);
+            */
         }
     }
 
     internal char? DetectCasioDigit(float[] samples)
     {
         List<GoertzelResult> results = Goertzel.Compute(samples, freqs, 8000);
-        _logger.LogInformation("Results: " + results.Count);
-
+        /* _logger.LogInformation("Results: " + results.Count);
+        */
         var lowGroup = results.Where(r => rows.Contains(r.Frequency)).OrderByDescending(r => r.Power).First();
         var highGroup = results.Where(r => cols.Contains(r.Frequency)).OrderByDescending(r => r.Power).First();
 
@@ -270,8 +274,10 @@ public class AudioHub : Hub
 
             char[,] keypad = { { '1', '2', '3' }, { '4', '5', '6' }, { '7', '8', '9' }, { '*', '0', '#' } };
             char detected = keypad[rowIdx, colIdx];
-            _logger.LogInformation("Match: {Num} (RowIdx:{R}, ColIdx:{C})", detected, rowIdx, colIdx);
 
+            /* DEBUG
+            _logger.LogInformation("Match: {Num} (RowIdx:{R}, ColIdx:{C})", detected, rowIdx, colIdx);
+            */
             return detected;
         }
 
