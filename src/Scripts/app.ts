@@ -1,7 +1,7 @@
 declare var signalR: any;
 
 const connection = new signalR.HubConnectionBuilder()
-    .withUrl("/audioHub")
+    .withUrl("/audioHub?clientApp=Databank-Frontend")
     .configureLogging(signalR.LogLevel.Information)
     .build();
 
@@ -92,7 +92,7 @@ async function startAudio(): Promise<void> {
         const source = audioContext.createMediaStreamSource(mediaStream);
 
         await audioContext.audioWorklet.addModule("js/audio-processor.js");
-        workletNode = new AudioWorkletNode(audioContext, "casio-audio-processor");
+        workletNode = new AudioWorkletNode(audioContext, "audio-processor");
 
         workletNode.port.onmessage = (event: MessageEvent) => {
             const audioChunk: Float32Array = event.data;

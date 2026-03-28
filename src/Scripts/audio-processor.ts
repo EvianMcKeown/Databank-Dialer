@@ -24,4 +24,4 @@ class CasioAudioProcessor extends AudioWorkletProcessor {
     }
 }
 
-registerProcessor("casio-audio-processor", CasioAudioProcessor);
+registerProcessor("audio-processor", CasioAudioProcessor);
