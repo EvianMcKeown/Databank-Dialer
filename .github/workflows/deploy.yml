@@ -18,10 +18,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Dependencies and Compile TS
+      - name: Install Dependencies, Compile TS, and Minify
         run: |
-          npm install -g typescript
+          npm install -g typescript terser
           tsc -p ./src/
+          terser ./src/js/app.js -o ./src/js/app.js --compress --mangle
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
