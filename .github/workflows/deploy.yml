@@ -22,7 +22,7 @@ jobs:
         run: |
           npm install -g typescript terser
           tsc -p ./src/
-          terser ./src/js/app.js -o ./src/js/app.js --compress --mangle
+          terser ./wwwroot/js/app.js -o ./wwwroot/js/app.js --compress --mangle
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
