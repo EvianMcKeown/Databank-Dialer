@@ -13,25 +13,42 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v6
 
-      - name: Setup Node.js (for TypeScript)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
-      - name: Install Dependencies, Compile TS, and Minify
+      - name: Install Tools and Compile TypeScript
         run: |
-          npm install -g typescript terser
-          tsc -p ./src/
-          terser ./wwwroot/js/app.js -o ./wwwroot/js/app.js --compress --mangle
+          # Install TS and minifiers locally in the runner for speed
+          npm install typescript terser clean-css-cli
+          # Use the root tsconfig which points to ./Scripts
+          npx tsc
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
 
       - name: Build and Publish
         run: |
+          # We publish first so we can minify the final output
           dotnet publish -c Release -r linux-x64 --self-contained false -o ./publish
+
+      - name: Post-Publish Minification (JS & CSS)
+        run: |
+          echo "Minifying JavaScript..."
+          # Protects Class/Function names for AudioWorklets and SignalR
+          find ./publish/wwwroot -name "*.js" -not -name "*.min.js" -exec npx terser {} -o {} \
+            --compress \
+            --mangle "keep_classnames=true,keep_fnames=true" \;
+
+          echo "Minifying CSS..."
+          find ./publish/wwwroot -name "*.css" -not -name "*.min.css" -exec npx cleancss -o {} {} \;
+
+          echo "Cleaning up stale compressed files..."
+          # Removes .br and .gz so the server doesn't serve old versions
+          find ./publish/wwwroot -type f \( -name "*.gz" -o -name "*.br" \) -delete
 
       - name: Deploy to Server via RSYNC
         uses: Burnett01/rsync-deployments@v8
