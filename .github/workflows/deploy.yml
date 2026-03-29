@@ -23,7 +23,7 @@ jobs:
           # Install TS and minifiers locally in the runner for speed
           npm install typescript terser clean-css-cli
           # Use the root tsconfig which points to ./Scripts
-          npx tsc
+          npx tsc -p ./src/
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
