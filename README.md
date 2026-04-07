@@ -16,7 +16,7 @@ This project uses a low-latency audio pipeline to ensure hardware dial tones are
 ## Technology Used
 * **Server**: .NET 10 (C#)
 * **Client**: TypeScript (ESNext)
-* **Signal Processing**: NAudio + Goertzel Implementation
+* **Signal Processing**: Goertzel Implementation
 * **Communication**: ASP.NET Core SignalR
 
 ---
