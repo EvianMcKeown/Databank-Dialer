@@ -21,10 +21,12 @@ This project uses a low-latency audio pipeline to ensure hardware dial tones are
 * **Backend**: *ASP.NET Core* (C#) implementing the [*Goertzel Algorithm*](http://en.wikipedia.org/wiki/Goertzel_algorithm) for DTMF frequency detection.
 
 ## Technology Used
-* **Server**: .NET 10 (C#)
-* **Client**: TypeScript (ESNext)
-* **Signal Processing**: Goertzel Implementation
-* **Communication**: ASP.NET Core SignalR
+| Layer | Technology | Role |
+|---|---|---|
+| Audio capture | TypeScript + AudioWorklet | Thread-isolated PCM sampling |
+| Transport | ASP.NET Core SignalR | Low-latency 16-bit PCM streaming |
+| DTMF decoding | C# (Goertzel algorithm) | Frequency detection on the server |
+| Server | .NET 10 | ASP.NET Core host |
 
 ---
 
