@@ -1,17 +1,24 @@
 # Casio-Databank-Dialer
-A high-performance, lightweight web application designed to listen to the acoustic DTMF "dialer" tones from a *Casio Databank DBA-800*/*DBA-80* watch. It decodes in real-time using a C# backend and provides a "click-to-dial" interface for modern smartphones.
+A high-performance, lightweight web application designed to listen to the DTMF 'dialer' tones from *Casio Databank DBA-800*/*DBA-80* watches. Decodes in real-time using a C# backend and provides a click-to-dial interface for modern smartphones.
 
 ## Status
 [![Web App](https://github.com/EvianMcKeown/Databank-Dialer/actions/workflows/deploy.yml/badge.svg)](https://github.com/EvianMcKeown/Databank-Dialer/actions/workflows/deploy.yml)
+
+![DBA-800-preview](src/wwwroot/images/preview.png)
+ 
+## How It Works
+1. Open the website on your phone (or any device with a microphone)
+2. Hold your DBA-800/DBA-80 close to the microphone
+3. Press on the 'Start Listening' button on the interface
+4. Play a saved contact number from the watch's phone dialer
+5. The web app decodes the tones and displays the number
+6. Tap the 'Dial Number' text to dial
 
 ## Architecture
 This project uses a low-latency audio pipeline to ensure hardware dial tones are captured and processed accurately:
 * **Frontend**: TypeScript with *AudioWorklet* for thread-isolated sampling.
 * **Transport**: *SignalR* streaming 16-bit PCM data from the browser to the server.
 * **Backend**: *ASP.NET Core* (C#) implementing the [*Goertzel Algorithm*](http://en.wikipedia.org/wiki/Goertzel_algorithm) for DTMF frequency detection.
-
-![DBA-800-preview](https://github.com/user-attachments/assets/aab3ab68-803d-45e5-89e6-3a7af018c68b)
-
 
 ## Technology Used
 * **Server**: .NET 10 (C#)
@@ -23,16 +30,25 @@ This project uses a low-latency audio pipeline to ensure hardware dial tones are
 
 ## Project Structure
 ```text
-CasioDialer/
-├── Scripts/                # TypeScript Source
-│   ├── app.ts              # UI & SignalR Client logic
-│   └── audio-processor.ts  # AudioWorklet (DSP Thread)
-├── wwwroot/
-│   ├── js/                 # Compiled JavaScript (Git Ignored)
-│   └── index.html          # Main Application UI
-├── AudioHub.cs             # C# SignalR Hub
-├── Program.cs              # ASP.NET Core Entry Point
-└── src.csproj              # .NET Project Configuration
+Casio-Databank-Dialer/
+├── src/
+│   ├── Scripts/
+│   │   ├── app.ts              # UI & SignalR client
+│   │   └── audio-processor.ts  # AudioWorklet (DSP thread)
+│   ├── wwwroot/
+│   │   ├── fonts/
+│   │   ├── images/
+│   │   ├── js/                 # Compiled JS (git-ignored)
+│   │   ├── index.html          # Main UI
+│   │   ├── robots.txt
+│   │   └── sitemap.xml
+│   ├── AudioHub.cs             # SignalR hub
+│   ├── Goertzel.cs             # DTMF frequency detection
+│   ├── Program.cs              # ASP.NET Core entry point
+│   └── src.csproj              # .NET project file
+├── tests/
+├── Casio-Databank-Dialer.sln
+└── LICENSE
 ```
 
 ## Setup & Development
