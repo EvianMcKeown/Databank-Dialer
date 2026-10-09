@@ -3,13 +3,17 @@ using Microsoft.AspNetCore.HttpOverrides;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSignalR();
-builder.Services.AddCors(options =>
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+if (allowedOrigins.Length > 0)
 {
-    options.AddDefaultPolicy(policy =>
+    builder.Services.AddCors(options =>
     {
-        policy.AllowAnyHeader().AllowAnyMethod().SetIsOriginAllowed(origin => true).AllowCredentials();
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+        });
     });
-});
+}
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -19,7 +23,10 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 var app = builder.Build();
 
 app.UseForwardedHeaders();
-app.UseCors();
+if (allowedOrigins.Length > 0)
+{
+    app.UseCors();
+}
 app.UseDefaultFiles(); // index.html
 app.UseStaticFiles(); // JS/CSS
 
