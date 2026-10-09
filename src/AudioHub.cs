@@ -46,35 +46,55 @@ public class AudioHub : Hub
     private readonly AudioLimits _limits;
     private readonly StreamAdmission _admission;
 
-    public AudioHub(ILogger<AudioHub> logger, Microsoft.Extensions.Options.IOptions<AudioLimits>? limits = null, StreamAdmission? admission = null)
+    private readonly IHubContext<AudioHub>? _hubContext;
+
+    public AudioHub(ILogger<AudioHub> logger, Microsoft.Extensions.Options.IOptions<AudioLimits>? limits = null, StreamAdmission? admission = null, IHubContext<AudioHub>? hubContext = null)
     {
         _logger = logger;
+        _hubContext = hubContext;
         _limits = limits?.Value ?? new AudioLimits();
         _admission = admission ?? new StreamAdmission();
     }
 
     // Allocate state when a client connects, unless a stream limit is reached.
-    public override Task OnConnectedAsync()
+    public override async Task OnConnectedAsync()
     {
         var ip = Context.GetHttpContext()?.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
         if (!_admission.TryAdmit(ip, _limits.MaxConcurrentStreams, _limits.MaxStreamsPerIp))
         {
             _logger.LogWarning("Stream refused (limit reached) for {Ip}", ip);
+            await Clients.Caller.SendAsync("SessionEnded", "busy");
             Context.Abort();
-            return Task.CompletedTask;
+            return;
         }
 
         var context = Context;
+        var hubContext = _hubContext;
+        var connectionId = Context.ConnectionId;
         var state = new ConnectionState
         {
             Ip = ip,
             Budget = new SessionBudget(_limits, DateTime.UtcNow),
         };
-        state.SessionTimer = new Timer(_ => context.Abort(), null, TimeSpan.FromSeconds(_limits.MaxSessionSeconds), Timeout.InfiniteTimeSpan);
+        state.SessionTimer = new Timer(async _ =>
+        {
+            try
+            {
+                if (hubContext is not null)
+                {
+                    await hubContext.Clients.Client(connectionId).SendAsync("SessionEnded", "time");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not announce session end for {Id}", connectionId);
+            }
+            context.Abort();
+        }, null, TimeSpan.FromSeconds(_limits.MaxSessionSeconds), Timeout.InfiniteTimeSpan);
         _connectionStates[Context.ConnectionId] = state;
         _logger.LogInformation("Client connected: {Id}", Context.ConnectionId);
-        return base.OnConnectedAsync();
+        await base.OnConnectedAsync();
     }
 
     // Free state when a client disconnects to avoid memory leaks.
@@ -157,6 +177,7 @@ public class AudioHub : Hub
         if (chunk is null || !state.Budget.Allow(chunk.Length, DateTime.UtcNow))
         {
             _logger.LogWarning("Stream over budget, closing: {Id}", Context.ConnectionId);
+            await Clients.Caller.SendAsync("SessionEnded", "limit");
             Context.Abort();
             return;
         }

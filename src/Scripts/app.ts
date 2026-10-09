@@ -2,7 +2,7 @@ declare var signalR: any;
 
 const connection = new signalR.HubConnectionBuilder()
     .withUrl("/audioHub?clientApp=Databank-Frontend")
-    .configureLogging(signalR.LogLevel.Information)
+    .configureLogging(signalR.LogLevel.Warning)
     .build();
 
 connection.on("ReceiveStatus", (message: string) => { console.log("Server responded: " + message); });
@@ -18,6 +18,8 @@ let audioContext: AudioContext | null = null;
 let workletNode: AudioWorkletNode | null = null;
 let mediaStream: MediaStream | null = null;
 let isListening = false;
+let sessionOver = false;
+let endReason: string | null = null;
 
 // Tear down the audio pipeline without touching the SignalR connection 
 function stopAudio(): void {
@@ -37,8 +39,14 @@ function resetSession(): void {
     document.dispatchEvent(new CustomEvent("dtmf:reset"));
 }
 
-function setButtonState(state: "idle" | "listening" | "error"): void {
-    const labels = { idle: "START LISTENING", listening: "STOP LISTENING", error: "RETRY" };
+function setButtonState(state: "idle" | "listening" | "error" | "ended" | "busy"): void {
+    const labels = {
+        idle: "START LISTENING",
+        listening: "STOP LISTENING",
+        error: "RETRY",
+        ended: "SESSION ENDED. RETRY",
+        busy: "SERVER BUSY. RETRY",
+    };
     startBtn.textContent = labels[state];
 }
 
@@ -52,12 +60,19 @@ connection.on("DetectedDigit", (digit: string) => {
 
 connection.on("DebugLog", (msg: string) => console.log("SERVER DEBUG:", msg));
 
-// Re-arm the button if SignalR drops unexpectedly mid-session.
+// The server announces why it is about to close the stream (time limit, rate limit or capacity).
+connection.on("SessionEnded", (reason: string) => {
+    sessionOver = true;
+    endReason = reason;
+});
+
+// Re-arm the button if SignalR drops mid-session, saying why when the server told us.
 connection.onclose(() => {
+    sessionOver = true;
     if (isListening) {
         stopAudio();
         isListening = false;
-        setButtonState("error");
+        setButtonState(endReason === "busy" ? "busy" : endReason ? "ended" : "error");
     }
 });
 
@@ -71,6 +86,7 @@ async function startAudio(): Promise<void> {
         stopAudio();
         isListening = false;
         setButtonState("idle");
+        await connection.stop().catch(() => { });
         return;
     }
 
@@ -80,11 +96,13 @@ async function startAudio(): Promise<void> {
     setButtonState("listening");
 
     try {
-        // Reuse an existing connection; start it only when necessary
-        if (connection.state === signalR.HubConnectionState.Disconnected) {
-            await connection.start();
-            console.log("SignalR connected.");
+        // Every listening session gets its own connection, so the server's session limit starts fresh
+        if (connection.state !== signalR.HubConnectionState.Disconnected) {
+            await connection.stop().catch(() => { });
         }
+        sessionOver = false;
+        endReason = null;
+        await connection.start();
 
         isListening = true;
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -96,14 +114,15 @@ async function startAudio(): Promise<void> {
 
         workletNode.port.onmessage = (event: MessageEvent) => {
             const audioChunk: Float32Array = event.data;
-            if (connection.state !== signalR.HubConnectionState.Connected) return;
+            if (sessionOver || connection.state !== signalR.HubConnectionState.Connected) return;
             connection
                 .invoke("UploadAudioChunk", Array.from(audioChunk))
-                .catch((err: unknown) => console.error("Upload failed:", err));
+                .catch((err: unknown) => {
+                    if (!sessionOver) console.error("Upload failed:", err);
+                });
         };
 
         source.connect(workletNode);
-        console.log("Audio pipeline active.");
 
     } catch (error) {
         console.error("Failed to start:", error);
